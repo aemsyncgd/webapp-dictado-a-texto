@@ -200,6 +200,7 @@
             if (!SpeechRecognition) {
                 statusBar.textContent = 'Tu navegador no soporta reconocimiento de voz';
                 statusBar.style.color = '#ff4444';
+                recordBtn.disabled = true;
                 return null;
             }
             
@@ -207,7 +208,6 @@
             recognizer.continuous = true;
             recognizer.interimResults = true;
             recognizer.lang = 'es-ES';
-            recognizer.maxAlternatives = 1;
             
             recognizer.onstart = function() {
                 isRecording = true;
@@ -234,50 +234,38 @@
                 textArea.value = finalTranscript + (interimTranscript ? interimTranscript : '');
                 textArea.scrollTop = textArea.scrollHeight;
                 
-                if (interimTranscript) {
-                    statusBar.textContent = 'Procesando...';
-                    statusBar.className = 'status-bar processing';
-                } else {
-                    statusBar.textContent = 'Escuchando...';
-                    statusBar.className = 'status-bar listening';
-                }
+                statusBar.textContent = 'Escuchando...';
+                statusBar.className = 'status-bar listening';
             };
             
             recognizer.onerror = function(event) {
-                console.log('Error:', event.error);
+                console.log('Error de voz:', event.error);
                 
-                if (!isRecording) return;
-                
-                switch(event.error) {
-                    case 'not-allowed':
-                        statusBar.textContent = 'Permiso denegado - permite el microfono';
-                        statusBar.style.color = '#ff4444';
-                        isRecording = false;
-                        recordBtn.textContent = 'Iniciar Dictado';
-                        recordBtn.classList.remove('active');
-                        break;
-                    case 'network':
-                        statusBar.textContent = 'Error de red';
-                        statusBar.style.color = '#ff4444';
-                        break;
-                    case 'no-speech':
-                        statusBar.textContent = 'No se detecto voz';
-                        statusBar.className = 'status-bar';
-                        break;
-                    case 'aborted':
-                        break;
-                    default:
-                        statusBar.textContent = 'Error: ' + event.error;
+                if (event.error === 'not-allowed') {
+                    statusBar.textContent = 'Permiso denegado - permite el microfono';
+                    statusBar.style.color = '#ff4444';
+                    isRecording = false;
+                    recordBtn.textContent = 'Iniciar Dictado';
+                    recordBtn.classList.remove('active');
+                } else if (event.error === 'network') {
+                    statusBar.textContent = 'Error de red';
+                    statusBar.style.color = '#ff9500';
+                } else if (event.error === 'no-speech') {
+                    // Ignorar silencios
+                } else if (event.error === 'service-not-allowed') {
+                    statusBar.textContent = 'Servicio no permitido';
+                    statusBar.style.color = '#ff4444';
+                    isRecording = false;
                 }
             };
             
             recognizer.onend = function() {
                 if (isRecording) {
-                    try {
-                        recognizer.start();
-                    } catch(e) {
-                        console.log('No se pudo reiniciar');
-                    }
+                    isRecording = false;
+                    statusBar.textContent = 'Detenido';
+                    statusBar.className = 'status-bar';
+                    recordBtn.textContent = 'Iniciar Dictado';
+                    recordBtn.classList.remove('active');
                 }
             };
             
