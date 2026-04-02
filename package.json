@@ -1,0 +1,13 @@
+{
+    "name": "dictado-por-voz",
+    "version": "1.0.0",
+    "description": "Aplicacion de dictado por voz con Web Speech API",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js",
+        "dev": "node server.js"
+    },
+    "dependencies": {
+        "vercel": "^32.0.0"
+    }
+}

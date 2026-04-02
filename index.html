@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dictado por Voz</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: #16213e;
+            border-radius: 20px;
+            padding: 30px;
+            width: 100%;
+            max-width: 800px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+        
+        h1 {
+            color: #fff;
+            text-align: center;
+            margin-bottom: 25px;
+            font-size: 28px;
+        }
+        
+        .status-bar {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            color: #888;
+            margin-bottom: 20px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        .status-bar.listening {
+            color: #00ff88;
+            background: #0f3460;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+        }
+        
+        .status-bar.processing {
+            color: #ff9500;
+        }
+        
+        .text-area {
+            width: 100%;
+            height: 350px;
+            background: #1a1a2e;
+            border: 2px solid #0f3460;
+            border-radius: 10px;
+            padding: 20px;
+            color: #fff;
+            font-size: 18px;
+            font-family: Arial, sans-serif;
+            resize: none;
+            outline: none;
+            line-height: 1.6;
+        }
+        
+        .text-area:focus {
+            border-color: #00ff88;
+        }
+        
+        .text-area::placeholder {
+            color: #555;
+        }
+        
+        .button-container {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            flex: 1;
+            min-width: 150px;
+            padding: 15px 25px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-record {
+            background: #555;
+            color: #fff;
+        }
+        
+        .btn-record.active {
+            background: #00ff88;
+            color: #000;
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.5);
+        }
+        
+        .btn-copy {
+            background: #0f3460;
+            color: #fff;
+        }
+        
+        .btn-copy:hover {
+            background: #1a4a7a;
+        }
+        
+        .btn-clear {
+            background: #0f3460;
+            color: #fff;
+        }
+        
+        .btn-clear:hover {
+            background: #8b0000;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #0f3460;
+            border-radius: 10px;
+            color: #888;
+            font-size: 13px;
+            text-align: center;
+        }
+        
+        .pulse {
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Dictado por Voz</h1>
+        
+        <div class="status-bar" id="statusBar">
+            Listo - Haz clic en "Iniciar Dictado"
+        </div>
+        
+        <textarea 
+            class="text-area" 
+            id="textArea" 
+            placeholder="El texto dictaminado aparecera aqui..."
+        ></textarea>
+        
+        <div class="button-container">
+            <button class="btn btn-record" id="recordBtn" onclick="toggleRecording()">
+                Iniciar Dictado
+            </button>
+            <button class="btn btn-copy" onclick="copyToClipboard()">
+                Copiar Texto
+            </button>
+            <button class="btn btn-clear" onclick="clearText()">
+                Limpiar
+            </button>
+        </div>
+        
+        <div class="info">
+            Compatible con Chrome, Edge y Safari. Habla claramente para mejores resultados.
+        </div>
+    </div>
+
+    <script>
+        let isRecording = false;
+        let recognition = null;
+        let finalTranscript = '';
+        let interimTranscript = '';
+        
+        const statusBar = document.getElementById('statusBar');
+        const textArea = document.getElementById('textArea');
+        const recordBtn = document.getElementById('recordBtn');
+        
+        function initRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            if (!SpeechRecognition) {
+                statusBar.textContent = 'Tu navegador no soporta reconocimiento de voz';
+                statusBar.style.color = '#ff4444';
+                return null;
+            }
+            
+            const recognizer = new SpeechRecognition();
+            recognizer.continuous = true;
+            recognizer.interimResults = true;
+            recognizer.lang = 'es-ES';
+            recognizer.maxAlternatives = 1;
+            
+            recognizer.onstart = function() {
+                isRecording = true;
+                finalTranscript = textArea.value;
+                statusBar.textContent = 'Escuchando...';
+                statusBar.className = 'status-bar listening';
+                recordBtn.textContent = 'Detener';
+                recordBtn.classList.add('active');
+            };
+            
+            recognizer.onresult = function(event) {
+                interimTranscript = '';
+                
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript + ' ';
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+                
+                textArea.value = finalTranscript + (interimTranscript ? interimTranscript : '');
+                textArea.scrollTop = textArea.scrollHeight;
+                
+                if (interimTranscript) {
+                    statusBar.textContent = 'Procesando...';
+                    statusBar.className = 'status-bar processing';
+                } else {
+                    statusBar.textContent = 'Escuchando...';
+                    statusBar.className = 'status-bar listening';
+                }
+            };
+            
+            recognizer.onerror = function(event) {
+                console.log('Error:', event.error);
+                
+                if (!isRecording) return;
+                
+                switch(event.error) {
+                    case 'not-allowed':
+                        statusBar.textContent = 'Permiso denegado - permite el microfono';
+                        statusBar.style.color = '#ff4444';
+                        isRecording = false;
+                        recordBtn.textContent = 'Iniciar Dictado';
+                        recordBtn.classList.remove('active');
+                        break;
+                    case 'network':
+                        statusBar.textContent = 'Error de red';
+                        statusBar.style.color = '#ff4444';
+                        break;
+                    case 'no-speech':
+                        statusBar.textContent = 'No se detecto voz';
+                        statusBar.className = 'status-bar';
+                        break;
+                    case 'aborted':
+                        break;
+                    default:
+                        statusBar.textContent = 'Error: ' + event.error;
+                }
+            };
+            
+            recognizer.onend = function() {
+                if (isRecording) {
+                    try {
+                        recognizer.start();
+                    } catch(e) {
+                        console.log('No se pudo reiniciar');
+                    }
+                }
+            };
+            
+            return recognizer;
+        }
+        
+        function toggleRecording() {
+            if (isRecording) {
+                isRecording = false;
+                if (recognition) {
+                    recognition.stop();
+                }
+                statusBar.textContent = 'Detenido';
+                statusBar.className = 'status-bar';
+                recordBtn.textContent = 'Iniciar Dictado';
+                recordBtn.classList.remove('active');
+            } else {
+                if (!recognition) {
+                    recognition = initRecognition();
+                }
+                if (recognition) {
+                    try {
+                        recognition.start();
+                    } catch (e) {
+                        console.error('Error al iniciar:', e);
+                        statusBar.textContent = 'Error al iniciar reconocimiento';
+                        statusBar.style.color = '#ff4444';
+                    }
+                }
+            }
+        }
+        
+        function copyToClipboard() {
+            const text = textArea.value;
+            if (text.trim()) {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        statusBar.textContent = 'Texto copiado';
+                        statusBar.className = 'status-bar';
+                        statusBar.style.color = '#00ff88';
+                        setTimeout(() => {
+                            statusBar.textContent = isRecording ? 'Escuchando...' : 'Listo';
+                            statusBar.className = isRecording ? 'status-bar listening' : 'status-bar';
+                            statusBar.style.color = '';
+                        }, 2000);
+                    }).catch(err => {
+                        fallbackCopy(text);
+                    });
+                } else {
+                    fallbackCopy(text);
+                }
+            } else {
+                statusBar.textContent = 'No hay texto para copiar';
+                statusBar.className = 'status-bar';
+                statusBar.style.color = '#ff9500';
+                setTimeout(() => {
+                    statusBar.textContent = 'Listo';
+                    statusBar.style.color = '';
+                }, 2000);
+            }
+        }
+        
+        function fallbackCopy(text) {
+            textArea.select();
+            textArea.setSelectionRange(0, 99999);
+            try {
+                document.execCommand('copy');
+                statusBar.textContent = 'Texto copiado';
+                statusBar.className = 'status-bar';
+                statusBar.style.color = '#00ff88';
+            } catch(e) {
+                statusBar.textContent = 'Error al copiar';
+                statusBar.style.color = '#ff4444';
+            }
+            setTimeout(() => {
+                statusBar.textContent = isRecording ? 'Escuchando...' : 'Listo';
+                statusBar.className = isRecording ? 'status-bar listening' : 'status-bar';
+                statusBar.style.color = '';
+            }, 2000);
+        }
+        
+        function clearText() {
+            textArea.value = '';
+            finalTranscript = '';
+            interimTranscript = '';
+            statusBar.textContent = 'Texto limpiado';
+            statusBar.className = 'status-bar';
+            statusBar.style.color = '#00ff88';
+            setTimeout(() => {
+                statusBar.textContent = isRecording ? 'Escuchando...' : 'Listo';
+                statusBar.className = isRecording ? 'status-bar listening' : 'status-bar';
+                statusBar.style.color = '';
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
